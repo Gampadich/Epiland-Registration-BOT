@@ -9,9 +9,9 @@ def filling (url, name, phoneNumber, date):
 
         # Click the 'Celebrate' CTA button
 
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1000)
         page.query_selector('a.layout_69771adf29588').click(force=True)
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1000)
 
         # Fill out the form fields
 

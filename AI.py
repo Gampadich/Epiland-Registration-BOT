@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 # Initialize Gemini AI Client
-client = genai.Client(api_key='YOUR_API_KEY_HERE')
+client = genai.Client(api_key='AIzaSyDQSaDT6K3IoKeW70-g8uPNSCISi51KSnE')
 
 
 async def askAItoAnswer(tgID, userMessage):
@@ -20,6 +20,8 @@ async def askAItoAnswer(tgID, userMessage):
                Do not leave them null if information is available!
             3. LOGIC: If user mentions a day (e.g., "Saturday"), calculate the date based on {time_now}.
             4. IS_COMPLETE: Set to true only if ALL fields (name, phone, city, date) are filled.
+            5. NORMALIZATION: All city names MUST be in the nominative case (називний відмінок).
+               Example: "у Києві" -> "Київ", "в Обухові" -> "Обухів", "у Чабанах" -> "Чабани".
 
             JSON STRUCTURE:
             {{
@@ -40,7 +42,7 @@ async def askAItoAnswer(tgID, userMessage):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',  # Updated to a stable flash model
+            model='gemini-2.5-flash-lite',  # Updated to a stable flash model
             contents=prompt
         )
 
