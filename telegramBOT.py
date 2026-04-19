@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram import F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, FSInputFile
 from AI import askAItoAnswer
 from database import saveUserData
 from automation import filling
@@ -14,6 +14,9 @@ TOKEN = '8355183430:AAFg6fmc8jxmG0jj797WcyTbFtfLskolrnY'
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# user_history for AI can remember his last conversations
+
+user_history = {}
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
@@ -26,8 +29,21 @@ async def cmd_start(message: types.Message):
 @dp.message()
 async def handle_docs(message: types.Message):
     """Handles all text messages, processes them via AI, and saves data to DB."""
-    response = await askAItoAnswer(str(message.from_user.id), message.text)
+    # Get history from user conversations with AI
+    tgID = str(message.from_user.id)
+
+    if tgID not in user_history:
+        user_history[tgID] = []
+
+    history_text = "\n".join(user_history[tgID])
+
+    response = await askAItoAnswer(tgID, message.text, history_text)
     await message.answer(response['reply'])
+
+    user_history[tgID].append(f"User: {message.text}")
+    user_history[tgID].append(f"AI: {response['reply']}")
+
+    user_history[tgID] = user_history[tgID][-6:]
 
     apiData = response.get('data', {})
 
@@ -40,18 +56,18 @@ async def handle_docs(message: types.Message):
         print(response)
         confirmKb = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text='✅ Confirm', callback_data='confirmBooking'),
-                InlineKeyboardButton(text='✏️ Edit', callback_data='changeData'),
-                InlineKeyboardButton(text='❌ Cancel', callback_data='cancelBooking'),
+                InlineKeyboardButton(text='✅ Підтвердити', callback_data='confirmBooking'),
+                InlineKeyboardButton(text='✏️ Змінити', callback_data='changeData'),
+                InlineKeyboardButton(text='❌ Скасувати', callback_data='cancelBooking'),
             ]
         ])
 
         textMessage = (
-            f"✅ *Please verify your booking details:* \n\n"
-            f"👤 Name: {apiData.get('name')}\n"
-            f"📞 Phone: {apiData.get('phone')}\n"
-            f"🏙️ City: {apiData.get('city')}\n"
-            f"📅 Date: {apiData.get('date')}"
+            f"✅ *Будь ласка перевірьте данні, які ви вказали під час бронювання:* \n\n"
+            f"👤 Ім'я: {apiData.get('name')}\n"
+            f"📞 Номер телефону: {apiData.get('phone')}\n"
+            f"🏙️ Місто: {apiData.get('city')}\n"
+            f"📅 Дата проведення свята: {apiData.get('date')}"
         )
 
         await message.answer(textMessage, reply_markup=confirmKb, parse_mode='Markdown')
@@ -64,7 +80,7 @@ async def confirmBooking(callback: CallbackQuery):
     await callback.message.answer('⏳ Заповнюємо форми, це може зайняти декілька хвилин...')
 
     # Extract data from the last message context via AI
-    response = await askAItoAnswer(str(callback.from_user.id), "Дістань данні з повідомлення")
+    response = await askAItoAnswer(str(callback.from_user.id), str(callback.message.text))
     apiData = response.get('data', {})
 
     # Safely handle city name for URL mapping
@@ -90,6 +106,11 @@ async def confirmBooking(callback: CallbackQuery):
         filling,
         str(url), apiData.get('name'), apiData.get('phone'), apiData.get('date')
     )
+    photo = FSInputFile('filledForms.png')
+    await callback.message.answer_photo(
+        photo,
+        caption='✅ Скріншот підтвердження бронювання'
+    )
     await callback.message.answer(f'✅ Успішно заброньовано {apiData.get("name")} в місті {apiData.get('city')}!')
 
 
@@ -97,7 +118,9 @@ async def confirmBooking(callback: CallbackQuery):
 async def changeData(callback: CallbackQuery):
     """Handles the edit request."""
     await callback.message.edit_reply_markup(reply_markup=None)
-    response = await askAItoAnswer(str(callback.from_user.id), "Мені потрібно щось змінити з цих даних")
+    tgID = callback.from_user.id
+    history_text = "\n".join(user_history.get(tgID, []))
+    response = await askAItoAnswer(tgID, "Мені потрібно щось змінити з цих даних", history_text)
     await callback.message.answer(response['reply'])
 
 
