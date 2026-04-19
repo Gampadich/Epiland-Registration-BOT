@@ -4,10 +4,10 @@ import json
 from datetime import datetime
 
 # Initialize Gemini AI Client
-client = genai.Client(api_key='AIzaSyDQSaDT6K3IoKeW70-g8uPNSCISi51KSnE')
+client = genai.Client(api_key='AIzaSyCpjWRI8_5ccaNEI0vrZCmbngZI7AurZDk')
 
 
-async def askAItoAnswer(tgID, userMessage):
+async def askAItoAnswer(tgID, userMessage, history=''):
     """Communicates with Gemini AI to parse user intent and return structured JSON."""
     data = getUserData(tgID)
     time_now = datetime.now().strftime("%d.%m.%Y, %A")
@@ -34,11 +34,19 @@ async def askAItoAnswer(tgID, userMessage):
     context = f"DB Data: Name: {data.get('name')}, Tel: {data.get('phone')}, City: {data.get('city')}" if data else "New client, no history."
 
     prompt = f"""
-        Role: Epiland Administrator. Goal: Fill the JSON structure based on conversation.
-        CONTEXT: {context}
-        USER MESSAGE: "{userMessage}"
-        {base_rules}
-    """
+            Role: Epiland Administrator. 
+            GOAL: Update the JSON structure.
+
+            CRITICAL INSTRUCTION: 
+            - If the user provides NEW information (like a new date), UPDATE the existing field in "data" but KEEP all other fields that were already known from CONTEXT.
+            - Do not ask for information that is already present in the CONTEXT unless the user explicitly wants to change it.
+
+            CONTEXT (Already known): {context}
+            PREVIOUS MESSAGES: {history}
+            USER CURRENT MESSAGE: "{userMessage}"
+
+            {base_rules}
+        """
 
     try:
         response = client.models.generate_content(
