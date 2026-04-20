@@ -18,6 +18,8 @@ def setupSQL():
         cur.close()
         conn.close()
 
+setupSQL()
+
 def saveUserData(tgID, name, phoneNum, city):
     """Saves or updates user profile information in the database."""
     conn = sqlite3.connect('database.db')
