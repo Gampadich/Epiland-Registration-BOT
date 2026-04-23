@@ -10,7 +10,8 @@ def setupSQL():
                 tgID TEXT PRIMARY KEY,
                 name TEXT,
                 phone TEXT,
-                city TEXT
+                city TEXT,
+                last_date TEXT
             )
         ''')
         conn.commit()
@@ -18,14 +19,14 @@ def setupSQL():
         cur.close()
         conn.close()
 
-def saveUserData(tgID, name, phoneNum, city):
+def saveUserData(tgID, name, phoneNum, city, last_date):
     """Saves or updates user profile information in the database."""
     conn = sqlite3.connect('database.db')
     cur = conn.cursor()
     try:
         cur.execute(
-            'INSERT OR REPLACE INTO users (tgID, name, phone, city) VALUES (?, ?, ?, ?)',
-            (tgID, name, phoneNum, city)
+            'INSERT OR REPLACE INTO users (tgID, name, phone, city, last_date) VALUES (?, ?, ?, ?, ?)',
+            (tgID, name, phoneNum, city, last_date)
         )
         conn.commit()
     finally:

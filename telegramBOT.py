@@ -9,6 +9,7 @@ from AI import askAItoAnswer
 from database import saveUserData, setupSQL
 from automation import filling
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Bot token for Telegram API interaction
 load_dotenv()
@@ -21,7 +22,6 @@ dp = Dispatcher()
 # user_history for AI can remember his last conversations
 
 user_history = {}
-
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Handles the /start command. Welcomes user and checks DB for existing data."""
@@ -54,7 +54,7 @@ async def handle_docs(message: types.Message):
 
     # Save data only if all required fields are present to avoid partial records
     if apiData.get('name') or apiData.get('phone') or apiData.get('city'):
-        saveUserData(message.from_user.id, apiData.get('name'), apiData.get('phone'), apiData.get('city'))
+        saveUserData(message.from_user.id, apiData.get('name'), apiData.get('phone'), apiData.get('city'), datetime.now().strftime("%d.%m.%Y %H:%M:%S"))
 
     # If AI gathered all info, show confirmation keyboard
     if response['is_complete']:

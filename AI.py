@@ -3,7 +3,8 @@ from dotenv import load_dotenv
 from google import genai
 from database import getUserData
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
+from utils import get_calculated_date
 
 # Initialize Gemini AI Client
 
@@ -15,44 +16,54 @@ async def askAItoAnswer(tgID, userMessage, history=''):
     """Communicates with Gemini AI to parse user intent and return structured JSON."""
     data = getUserData(tgID)
     today = datetime.now()
-    tomorrow = today + timedelta(days=1)
-    after_tomorrow = today + timedelta(days=2)
 
     # System instructions for the AI to ensure consistent JSON output
     base_rules = f"""
-            RULES:
-            1. DATA RULE: If Name, Phone, or City exists in the "CONTEXT", fill the "data" block. 
-               Do not leave them null if information is available!
-            2. LOGIC: If user mentions a day (e.g., "Saturday"), calculate the date based on days:
-                Today is {today.strftime('%d.%m.%Y, %A')}.
-                Tomorrow is {tomorrow.strftime('%d.%m.%Y')}.
-                After tomorrow is {after_tomorrow.strftime('%d.%m.%Y')}..
-            3. IS_COMPLETE: Set to true only if ALL fields (name, phone, city, date) are filled.
-            4. NORMALIZATION: All city names MUST be in the nominative case (називний відмінок).
-               Example: "у Києві" -> "Київ", "в Обухові" -> "Обухів", "у Чабанах" -> "Чабани".
+                RULES:
+                1. DATA RULE: Use "CONTEXT" to fill the "data" block. Do not leave null if info is available!
+                2. DATE LOGIC (CRITICAL): Do not calculate DD.MM.YYYY. 
+                   Instead, fill "date_params" object:
+                   - "day": English weekday name (monday, tuesday, wednesday, thursday, friday, saturday, sunday) or null.
+                   - "weeks_added": 0 for this week, 1 for "next week", etc.
+                   - "is_today": true if user says "today" or "now".
+                   - "is_tomorrow": true if user says "tomorrow".
+                   - "exact_date": If user provides a specific date like "25.04", put it here.
+                3. IS_COMPLETE: true only if name, phone, city are filled AND any date info is present in date_params.
+                4. NORMALIZATION: City names MUST be in nominative case (Київ, Обухів).
 
-            JSON STRUCTURE:
-            {{
-                "reply": "Your polite response or a question about missing info",
-                "is_complete": true/false,
-                "data": {{ "name": "name/null", "phone": "number/null", "date": "DD.MM.YYYY/null", "city": "city/null" }}
-            }}
-        """
+                JSON STRUCTURE:
+                {{
+                    "reply": "text",
+                    "is_complete": true/false,
+                    "data": {{ 
+                        "name": "name/null", 
+                        "phone": "number/null", 
+                        "city": "city/null",
+                        "date_params": {{
+                            "day": "string/null",
+                            "weeks_added": 0,
+                            "is_today": false,
+                            "is_tomorrow": false,
+                            "exact_date": "string/null"
+                        }}
+                    }}
+                }}
+            """
 
     context = f"DB Data: Name: {data.get('name')}, Tel: {data.get('phone')}, City: {data.get('city')}" if data else "New client, no history."
 
     prompt = f"""
             Role: Epiland Administrator. 
-            GOAL: Update the JSON structure.
+            Today is {today.strftime('%A, %d.%m.%Y')}.
 
-            CRITICAL INSTRUCTION: 
-            - If the user provides NEW information (like a new date), UPDATE the existing field in "data" but KEEP all other fields that were already known from CONTEXT.
-            - Do not ask for information that is already present in the CONTEXT unless the user explicitly wants to change it.
+            GOAL: Extract info and update JSON.
+            If the user changes information (e.g., new city), update it. 
+            Keep existing data from CONTEXT if not changed.
 
-            CONTEXT (Already known): {context}
-            PREVIOUS MESSAGES: {history}
-            USER CURRENT MESSAGE: "{userMessage}"
-
+            CONTEXT: {context}
+            HISTORY: {history}
+            USER MESSAGE: "{userMessage}"
+            
             {base_rules}
         """
 
@@ -67,12 +78,21 @@ async def askAItoAnswer(tgID, userMessage, history=''):
 
         # Clean Markdown formatting from AI response to get pure JSON
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
-        return json.loads(clean_text)
+        res = json.loads(clean_text)
+
+        date_params = res['data'].get('date_params')
+        final_date = get_calculated_date(date_params)
+        res['data']['date'] = final_date
+
+        if not final_date:
+            res['is_complete'] = False
+
+        return res
 
     except Exception as e:
         print(f"AI/JSON Error: {e}")
         return {
-            "reply": "Ой. Мої мізки трохи перегрілись, повторіть будь ласка через декілька хвилин!",
+            "reply": "Вибач, я трохи завис. Спробуй ще раз!",
             "is_complete": False,
-            "data": {"name": None, "phone": None, "date": None, "city": None}
+            "data": {"name": None, "phone": None, "city": None, "date_params": None}
         }
