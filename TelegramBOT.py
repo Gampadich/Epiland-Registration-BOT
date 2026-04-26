@@ -6,8 +6,8 @@ from aiogram import F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, FSInputFile
 from AI import askAItoAnswer
-from database import saveUserData, setupSQL
-from automation import filling
+from Database import saveUserData, setupSQL
+from Automation import filling
 from dotenv import load_dotenv
 from datetime import datetime
 

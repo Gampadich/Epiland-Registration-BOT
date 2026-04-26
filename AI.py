@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-from database import getUserData
+from Database import getUserData
 import json
 from datetime import datetime
-from utils import get_calculated_date
+from CalculateData import get_calculated_date
+from ValidateNumber import validateNumber
 
 # Initialize Gemini AI Client
 
@@ -30,6 +31,7 @@ async def askAItoAnswer(tgID, userMessage, history=''):
                    - "exact_date": If user provides a specific date like "25.04", put it here.
                 3. IS_COMPLETE: true only if name, phone, city are filled AND any date info is present in date_params.
                 4. NORMALIZATION: City names MUST be in nominative case (Київ, Обухів).
+                5. LANGUAGE RULE: Use correct Ukrainian grammar and declension (відмінювання). The name "Epiland" in the instrumental case is "Епіландом".
 
                 JSON STRUCTURE:
                 {{
@@ -69,7 +71,7 @@ async def askAItoAnswer(tgID, userMessage, history=''):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash-lite',  # Updated to a stable flash model
+            model='gemini-2.5-flash-lite',
             contents=prompt
         )
 
@@ -79,6 +81,23 @@ async def askAItoAnswer(tgID, userMessage, history=''):
         # Clean Markdown formatting from AI response to get pure JSON
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
         res = json.loads(clean_text)
+
+        #Calling Validate Number function
+
+        phone = res['data'].get('phone')
+
+        if phone:
+            is_valid, validatedPhone = validateNumber(phone)
+
+            if is_valid:
+                res['data']['phone'] = validatedPhone
+
+            else:
+                res['data']['phone'] = None
+                res['is_complete'] = False
+                res['reply'] = f"Здається, номер телефону вказано невірно. {res['reply']}"
+
+        # Calling Validate Data function
 
         date_params = res['data'].get('date_params')
         final_date = get_calculated_date(date_params)

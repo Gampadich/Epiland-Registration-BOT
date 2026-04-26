@@ -22,7 +22,7 @@ def filling (url, name, phoneNumber, date):
         # Select marketing source and capture proof
 
         page.select_option('select.form-select', label='Telegram')
-        page.screenshot(path='filledForms.png')
+        page.screenshot(path='FilledForms.png')
 
         browser.close()
 
